@@ -1,4 +1,4 @@
-# invest-starter-demo
+# invest-starter-demo-java
 
 В этом репозитории хранятся примеры на языке `java` для проекта [invest-api-java-sdk-starter](https://github.com/Dankosik/invest-api-java-sdk-starter)
 
