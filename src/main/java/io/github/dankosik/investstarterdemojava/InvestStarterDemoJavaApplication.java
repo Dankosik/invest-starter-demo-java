@@ -25,9 +25,23 @@ import io.github.dankosik.starter.invest.contract.marketdata.trade.BlockingTrade
 import io.github.dankosik.starter.invest.contract.operation.portfolio.AsyncPortfolioHandler;
 import io.github.dankosik.starter.invest.contract.operation.positions.AsyncPositionHandler;
 import io.github.dankosik.starter.invest.contract.orders.AsyncOrderHandler;
+import io.github.dankosik.starter.invest.processor.marketdata.BlockingCandleStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.BlockingLastPriceStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.BlockingOrderBookStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.BlockingTradeStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.BlockingTradingStatusStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.CandleStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.marketdata.LastPriceStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.marketdata.OrderBookStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.marketdata.TradeStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.marketdata.TradingStatusStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.marketdata.common.AsyncMarketDataStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.marketdata.common.MarketDataStreamProcessorAdapterFactory;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import ru.tinkoff.piapi.contract.v1.Candle;
 import ru.tinkoff.piapi.contract.v1.LastPrice;
 import ru.tinkoff.piapi.contract.v1.OrderBook;
@@ -38,6 +52,7 @@ import ru.tinkoff.piapi.contract.v1.SubscriptionInterval;
 import ru.tinkoff.piapi.contract.v1.Trade;
 import ru.tinkoff.piapi.contract.v1.TradingStatus;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @SpringBootApplication
@@ -49,12 +64,13 @@ public class InvestStarterDemoJavaApplication {
 
 }
 
-/** Обработка каждого трейда для выбранного тикера/figi/instrumentUid.
+/**
+ * Обработка каждого трейда для выбранного тикера/figi/instrumentUid.
  * Использование instrumentType имеет смысл только если вы используете ticker, вместо figi или instrumentUid.
  * Если вы используете ticker при старте приложения будет выполнен запрос на поиск instrumentUid по переданному тикеру.
  * instrumentType нужен лишь для того чтобы сделать это за меньшее количество запросов к api, и с целью уменьшит трату лимитов
  * Блокирующие хендлеры рекомендуется юзать на jdk21+, исполнение будет на виртуальных потоках
- * */
+ */
 @HandleTrade(ticker = "SiH4")
 class BlockingDollarHandler implements BlockingTradeHandler {
 
@@ -69,7 +85,7 @@ class BlockingDollarHandler implements BlockingTradeHandler {
  * Хендлеров может быть сколько угодно, все они будут обрабатываться параллельно.
  * Если указанный тикер был хотя бы в одном из других хендлеров, то instrumentType можно не использовать.
  * Новые запросы для получения тикера не будут исполняться
- * */
+ */
 @HandleTrade(ticker = "SiH4")
 class AsyncDollarHandler implements AsyncTradeHandler {
 
@@ -94,9 +110,12 @@ class CommonBeforeEachTradesHandler implements AsyncTradeHandler {
 }
 
 /**
- * обработка всех трейдов (опция afterEachTradesHandler означает что выполнится этот handler после всех остальных)
+ * обработка всех трейдов для выбранных тикеров(опция afterEachTradesHandler означает что выполнится этот handler после всех остальных)
  */
-@HandleAllTrades(afterEachTradesHandler = true)
+@HandleAllTrades(
+        tickers = {"CRH4", "BRF4", "SBER", "LKOH"},
+        afterEachTradesHandler = true
+)
 class CommonAfterEachTradesHandler implements AsyncTradeHandler {
     @NotNull
     @Override
@@ -347,5 +366,81 @@ class AllOrderHandler implements AsyncOrderHandler {
     @Override
     public CompletableFuture<Void> handleAsync(@NotNull OrderTrades orderTrades) {
         return CompletableFuture.runAsync(() -> System.out.println("AllOrderHandler: " + orderTrades));
+    }
+}
+
+@Configuration
+class Config {
+
+    /**
+     * Можно обрабатывать все события marketData
+     */
+    public AsyncMarketDataStreamProcessorAdapter marketDataStreamProcessorAdapter() {
+        return MarketDataStreamProcessorAdapterFactory
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createAsyncHandler(marketDataResponse ->
+                        CompletableFuture.runAsync(() -> System.out.println("marketDataStreamProcessorAdapter:" + marketDataResponse))
+                );
+        //        .withFigies(listOf("BBG004730N88")) можно использовать вместо withTickers
+//        .withInstrumentUids(listOf("e6123145-9665-43e0-8413-cd61b8aa9b13")) можно использовать вместо withTickers
+//        .runAfterEachTradeHandler(true)  опционально
+//        .runBeforeEachCandleHandler(true) опционально
+//        .runAfterEachLastPriceHandler(true) опционально
+//        .runBeforeEachOrderBookHandler(true) опционально
+    }
+
+    /**
+     * Аналог HandleAllLastPrice
+     */
+    @Bean
+    public BlockingLastPriceStreamProcessorAdapter coroutineLastPriceStreamProcessorAdapter() {
+        return LastPriceStreamProcessorAdapterFactory
+//            .runAfterEachLastPriceHandler(true) опционально
+//            .runBeforeEachLastPriceHandler(true) опционально
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createBlockingHandler(System.out::println); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
+    }
+
+    /**
+     * Аналог HandleAllTrades
+     */
+    @Bean
+    public BlockingTradeStreamProcessorAdapter coroutineTradeStreamProcessorAdapter() {
+        return TradeStreamProcessorAdapterFactory
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createBlockingHandler(System.out::println); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
+    }
+
+    /**
+     * Аналог HandleAllTradingStatuses
+     */
+    @Bean
+    public BlockingTradingStatusStreamProcessorAdapter coroutineTradingStatusStreamProcessorAdapter() {
+        return TradingStatusStreamProcessorAdapterFactory
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createBlockingHandler(tradingStatus -> System.out.println("TradingStatusStreamProcessorAdapterFactory: " + tradingStatus));
+    }
+
+    /**
+     * Аналог HandleAllCandles
+     */
+    @Bean
+    public BlockingCandleStreamProcessorAdapter coroutineCandleStreamProcessorAdapter() {
+        return CandleStreamProcessorAdapterFactory
+                .withSubscriptionInterval(SubscriptionInterval.SUBSCRIPTION_INTERVAL_ONE_MINUTE)
+                .waitClose(true)
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createBlockingHandler(System.out::println);
+    }
+
+    /**
+     * Аналог HandleAllOrderBooks
+     */
+    @Bean
+    public BlockingOrderBookStreamProcessorAdapter coroutineOrderBookStreamProcessorAdapter() {
+        return OrderBookStreamProcessorAdapterFactory
+                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .createBlockingHandler(System.out::println);
+
     }
 }
