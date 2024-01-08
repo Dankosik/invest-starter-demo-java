@@ -37,6 +37,12 @@ import io.github.dankosik.starter.invest.processor.marketdata.TradeStreamProcess
 import io.github.dankosik.starter.invest.processor.marketdata.TradingStatusStreamProcessorAdapterFactory;
 import io.github.dankosik.starter.invest.processor.marketdata.common.AsyncMarketDataStreamProcessorAdapter;
 import io.github.dankosik.starter.invest.processor.marketdata.common.MarketDataStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.operation.BlockingPortfolioStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.operation.BlockingPositionsStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.operation.PortfolioStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.operation.PositionsStreamProcessorAdapterFactory;
+import io.github.dankosik.starter.invest.processor.order.BlockingOrdersStreamProcessorAdapter;
+import io.github.dankosik.starter.invest.processor.order.OrdersStreamProcessorAdapterFactory;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -113,7 +119,7 @@ class CommonBeforeEachTradesHandler implements AsyncTradeHandler {
  * обработка всех трейдов для выбранных тикеров(опция afterEachTradesHandler означает что выполнится этот handler после всех остальных)
  */
 @HandleAllTrades(
-        tickers = {"CRH4", "BRF4", "SBER", "LKOH"},
+        tickers = {"CRH4", "BRG4", "SBER", "LKOH"},
         afterEachTradesHandler = true
 )
 class CommonAfterEachTradesHandler implements AsyncTradeHandler {
@@ -224,8 +230,8 @@ class DollarCandleHandler implements AsyncCandleHandler {
  * subscriptionInterval нужен чтобы выбрать интервал который будет обрабатывать этот хендлер
  */
 @HandleAllCandles(
-        beforeEachCandleHandler = true,
-        subscriptionInterval = SubscriptionInterval.SUBSCRIPTION_INTERVAL_ONE_MINUTE
+        subscriptionInterval = SubscriptionInterval.SUBSCRIPTION_INTERVAL_ONE_MINUTE,
+        tickers = {"SiH4", "SBER"}
 )
 class CommonBeforeEachCandleHandler implements AsyncCandleHandler {
 
@@ -295,7 +301,7 @@ class CommonAfterEachTradingStatusHandler implements AsyncTradingStatusHandler {
 /**
  * обработка изменения позиций портфеля для конкретного аккаунта
  */
-@HandlePortfolio(account = "accountId")
+@HandlePortfolio(account = "accountId") //замените на ваш актуальный
 class PortfolioHandler implements AsyncPortfolioHandler {
 
     @NotNull
@@ -308,7 +314,7 @@ class PortfolioHandler implements AsyncPortfolioHandler {
 /**
  * обработка изменения позиций портфеля для нескольких аккаунтов
  */
-@HandleAllPortfolios(accounts = {"accountId", "accountId2"})
+@HandleAllPortfolios(accounts = {"accountId", "accountId2"}) //замените на ваши актуальные
 class AllPortfolioHandler implements AsyncPortfolioHandler {
 
     @NotNull
@@ -321,7 +327,7 @@ class AllPortfolioHandler implements AsyncPortfolioHandler {
 /**
  * обработка изменения позиций для конкретного аккаунта
  */
-@HandlePosition(account = "accountId")
+@HandlePosition(account = "accountId") //замените на ваш актуальный
 class PositionHandler implements AsyncPositionHandler {
 
     @NotNull
@@ -334,7 +340,7 @@ class PositionHandler implements AsyncPositionHandler {
 /**
  * обработка изменения позиций для нескольких аккаунтов
  */
-@HandleAllPositions(accounts = {"accountId", "accountId2"})
+@HandleAllPositions(accounts = {"accountId", "accountId2"}) //замените на ваши актуальные
 class AllPositionHandler implements AsyncPositionHandler {
 
     @NotNull
@@ -360,7 +366,7 @@ class OrderHandler implements AsyncOrderHandler {
 /**
  * обработка всех ордеров из нескольких аккаунтов
  */
-@HandleAllOrders(accounts = {"accountId", "accountId2"})
+@HandleAllOrders(accounts = {"accountId", "accountId2"}) //замените на ваши актуальные
 class AllOrderHandler implements AsyncOrderHandler {
     @NotNull
     @Override
@@ -375,9 +381,10 @@ class Config {
     /**
      * Можно обрабатывать все события marketData
      */
+    @Bean
     public AsyncMarketDataStreamProcessorAdapter marketDataStreamProcessorAdapter() {
         return MarketDataStreamProcessorAdapterFactory
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
                 .createAsyncHandler(marketDataResponse ->
                         CompletableFuture.runAsync(() -> System.out.println("marketDataStreamProcessorAdapter:" + marketDataResponse))
                 );
@@ -397,8 +404,8 @@ class Config {
         return LastPriceStreamProcessorAdapterFactory
 //            .runAfterEachLastPriceHandler(true) опционально
 //            .runBeforeEachLastPriceHandler(true) опционально
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
-                .createBlockingHandler(System.out::println); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
+                .createBlockingHandler(lastPrice -> System.out.println("LastPriceStreamProcessorAdapterFactory" + lastPrice)); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
     }
 
     /**
@@ -407,8 +414,8 @@ class Config {
     @Bean
     public BlockingTradeStreamProcessorAdapter coroutineTradeStreamProcessorAdapter() {
         return TradeStreamProcessorAdapterFactory
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
-                .createBlockingHandler(System.out::println); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
+                .createBlockingHandler(trade -> System.out.println("TradeStreamProcessorAdapterFactory" + trade)); // для jdk 21+ BlockingHandler будет исполнен в виртуальном потоке
     }
 
     /**
@@ -417,7 +424,7 @@ class Config {
     @Bean
     public BlockingTradingStatusStreamProcessorAdapter coroutineTradingStatusStreamProcessorAdapter() {
         return TradingStatusStreamProcessorAdapterFactory
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
                 .createBlockingHandler(tradingStatus -> System.out.println("TradingStatusStreamProcessorAdapterFactory: " + tradingStatus));
     }
 
@@ -427,10 +434,10 @@ class Config {
     @Bean
     public BlockingCandleStreamProcessorAdapter coroutineCandleStreamProcessorAdapter() {
         return CandleStreamProcessorAdapterFactory
-                .withSubscriptionInterval(SubscriptionInterval.SUBSCRIPTION_INTERVAL_ONE_MINUTE)
+                .withSubscriptionInterval(SubscriptionInterval.SUBSCRIPTION_INTERVAL_2_MIN)
                 .waitClose(true)
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
-                .createBlockingHandler(System.out::println);
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
+                .createBlockingHandler(candle -> System.out.println("BlockingCandleStreamProcessorAdapter" + candle));
     }
 
     /**
@@ -439,8 +446,40 @@ class Config {
     @Bean
     public BlockingOrderBookStreamProcessorAdapter coroutineOrderBookStreamProcessorAdapter() {
         return OrderBookStreamProcessorAdapterFactory
-                .withTickers(List.of("CRH4", "BRF4", "SBER", "LKOH"))
-                .createBlockingHandler(System.out::println);
+                .withTickers(List.of("CRH4", "BRG4", "SBER", "LKOH"))
+                .createBlockingHandler(orderBook -> System.out.println("OrderBookStreamProcessorAdapterFactory" + orderBook));
+
+    }
+
+    /**
+     * Аналог HandleAllPortfolios
+     */
+    @Bean
+    public BlockingPortfolioStreamProcessorAdapter portfolioStreamProcessorAdapterFactory() {
+        return PortfolioStreamProcessorAdapterFactory.withAccounts(List.of("accountId", "accountId2")) //замените на ваши актуальные
+                .createBlockingHandler(portfolioStreamResponse -> System.out.println("BlockingPortfolioStreamProcessorAdapter" + portfolioStreamResponse));
+
+    }
+
+    /**
+     * Аналог HandleAllPositions
+     */
+    @Bean
+    public BlockingPositionsStreamProcessorAdapter positionsStreamProcessorAdapterFactory() {
+        return PositionsStreamProcessorAdapterFactory.withAccounts(List.of("accountId", "accountId2")) //замените на ваши актуальные
+                .createBlockingHandler(portfolioStreamResponse -> System.out.println("BlockingPositionsStreamProcessorAdapter" + portfolioStreamResponse));
+
+    }
+
+    /**
+     * Аналог HandleAllPositions
+     */
+    @Bean
+    public BlockingOrdersStreamProcessorAdapter ordersStreamProcessorAdapterFactory() {
+        return OrdersStreamProcessorAdapterFactory
+                .withTickers(List.of("SBER"))
+                .withAccounts(List.of("accountId", "accountId2")) //замените на ваши актуальные
+                .createBlockingHandler(portfolioStreamResponse -> System.out.println("BlockingOrdersStreamProcessorAdapterFactory" + portfolioStreamResponse));
 
     }
 }
